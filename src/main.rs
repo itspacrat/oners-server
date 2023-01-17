@@ -11,12 +11,13 @@ use {
 };
 struct Handler;
 /// splits content into args by spaces
-/// TODO: quote marching
+///
+/// *TODO: quote marching*
 fn collect_args<'a>(content:&'a String) -> Vec<&'a str>{
     let out = (*content).split(" ").map(|a|a).collect::<Vec<&str>>();
     out.clone()
 }
-
+const PREFIX: &str = "/one";
 #[async_trait]
 impl EventHandler for Handler {
     
@@ -26,16 +27,32 @@ impl EventHandler for Handler {
     // Event handlers are dispatched through a threadpool, and so multiple
     // events can be dispatched simultaneously.
     async fn message(&self, ctx: Context, msg: Message) {
+        let args = collect_args(&msg.content);
         
-        let mut ping_out: String = String::from("");
-        match msg.content.as_str() {
-            "!ping" => {
-                ping_out = String::from("hello!!!!!!");
-                let _ = msg.reply_ping(ctx, format!("{}", ping_out)).await.unwrap();
+        if !(args[0] == PREFIX){
+            // don't parse, not a command
+        }else{
+        println!("{:?}",args);
+        let ping_out: String;
+        match args[1] {
+            "help" => {
+                ping_out = format!("```/one <command> <subcommand> [options]```");
             }
-            _ => {}
+            "game" => {
+                match args[2] {
+                    _ => {ping_out = format!("game: invalid or missing argument");}
+                }
+            }
+            "ping" => {
+                ping_out = format!("hello!!!!!!");
+            }
+            _ => {
+                ping_out = format!("no command: \"{}\"",args[1]);
+            }
         }
+        let _ = msg.reply_ping(ctx, format!("{}", ping_out)).await.unwrap();
         println!("{}", ping_out);
+    }
     }
 
     // Set a handler to be called on the `ready` event. This is called when a
