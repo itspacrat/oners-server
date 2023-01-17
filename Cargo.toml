@@ -11,3 +11,4 @@ rand_derive = "0.5"
 strum_macros ="0.24"
 serenity = {git="https://github.com/serenity-rs/serenity.git", branch="current", default-features = false, features = ["client", "gateway", "rustls_backend", "model"]}
 tokio = {version="1.17", features=["macros", "rt-multi-thread"]}
+#liboners = {}
