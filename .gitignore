@@ -4,3 +4,4 @@ bot.sh
 games/
 users/
 db/
+*.code-workspace
