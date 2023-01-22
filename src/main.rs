@@ -1,11 +1,15 @@
+use std::future::Future;
+
+use serenity::model::channel;
+
 use {
+    liboners::*,
     serenity::{
         async_trait,
         model::{channel::Message, gateway::Ready},
         prelude::*,
     },
     std::{collections::HashMap, env, path::Path},
-    liboners::*,
     tokio::fs::{create_dir_all, read_to_string, write, OpenOptions},
     tokio::io::AsyncWriteExt,
 };
@@ -13,46 +17,48 @@ struct Handler;
 /// splits content into args by spaces
 ///
 /// *TODO: quote marching*
-fn collect_args<'a>(content:&'a String) -> Vec<&'a str>{
-    let out = (*content).split(" ").map(|a|a).collect::<Vec<&str>>();
+fn collect_args<'a>(content: &'a String) -> Vec<&'a str> {
+    let out = (*content).split(" ").map(|a| a).collect::<Vec<&str>>();
     out.clone()
 }
 const PREFIX: &str = "/one";
 #[async_trait]
 impl EventHandler for Handler {
-    
     // Set a handler for the `message` event - so that whenever a new message
     // is received - the closure (or function) passed will be called.
     //
     // Event handlers are dispatched through a threadpool, and so multiple
     // events can be dispatched simultaneously.
-    async fn message(&self, ctx: Context, msg: Message) {
+    async fn message(&self, ctx: Context, mut msg: Message) {
         let args = collect_args(&msg.content);
-        
-        if !(args[0] == PREFIX){
-            // don't parse, not a command
-        }else{
-        println!("{:?}",args);
-        let ping_out: String;
-        match args[1] {
-            "help" => {
-                ping_out = format!("```/one <command> <subcommand> [options]```");
-            }
-            "game" => {
-                match args[2] {
-                    _ => {ping_out = format!("game: invalid or missing argument");}
+
+        if !(args[0] == PREFIX) {
+            () // don't parse, not a command
+        } else {
+            println!("{:?}", args);
+            let ping_out: String;
+            //let ping_out: String;
+            match args[1] {
+                "help" => {
+                    ping_out = format!("h")
+                    //future_replies.push(msg.reply(&ctx,format!("(help message)")));
+                }
+                "test" => {
+                    ping_out = format!("{:?}",{
+                        &msg.reply_ping(&ctx,"msg1")
+                         .await.unwrap().to_owned()
+                        .edit(&ctx,|m|m.content("edit: msg 2"))
+                         .await.unwrap()
+                    });
+                }
+                _ => {
+                    ping_out = format!("no command: \"{}\"", args[1]);
                 }
             }
-            "ping" => {
-                ping_out = format!("hello!!!!!!");
-            }
-            _ => {
-                ping_out = format!("no command: \"{}\"",args[1]);
-            }
+            let bot_msg_id = msg.reply_ping(ctx, format!("{}", ping_out)).await.unwrap().id.0;
+            println!("{} -> {}",bot_msg_id,ping_out);
+            
         }
-        let _ = msg.reply_ping(ctx, format!("{}", ping_out)).await.unwrap();
-        println!("{}", ping_out);
-    }
     }
 
     // Set a handler to be called on the `ready` event. This is called when a
