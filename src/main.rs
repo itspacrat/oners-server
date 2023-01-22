@@ -1,20 +1,16 @@
-use std::future::Future;
-
-use serenity::model::channel;
-
 use {
-    liboners::*,
+    //liboners::*,
     serenity::{
         async_trait,
-        model::{channel::Message, gateway::Ready},
+        model::{channel::Message, gateway::Ready,prelude::*},
         prelude::*,
     },
-    std::{collections::HashMap, env, path::Path},
+    std::{collections::HashMap, env, path::Path,future::Future},
     tokio::fs::{create_dir_all, read_to_string, write, OpenOptions},
     tokio::io::AsyncWriteExt,
 };
 struct Handler;
-/// splits content into args by spaces
+/// splits content into a vector of args by spaces
 ///
 /// *TODO: quote marching*
 fn collect_args<'a>(content: &'a String) -> Vec<&'a str> {
@@ -24,6 +20,11 @@ fn collect_args<'a>(content: &'a String) -> Vec<&'a str> {
 const PREFIX: &str = "/one";
 #[async_trait]
 impl EventHandler for Handler {
+    // Set a handler for the `add reaction` event - so that whenever a new reaction
+    // is added - the closure (or function) passed will be called.
+    async fn reaction_add(&self, ctx: Context, re: Reaction){
+        println!("detected reaction {:?}",&re);
+    }
     // Set a handler for the `message` event - so that whenever a new message
     // is received - the closure (or function) passed will be called.
     //
@@ -35,7 +36,7 @@ impl EventHandler for Handler {
         if !(args[0] == PREFIX) {
             () // don't parse, not a command
         } else {
-            println!("{:?}", args);
+            println!("{:?}", &args[1..]);
             let ping_out: String;
             //let ping_out: String;
             match args[1] {
@@ -47,8 +48,7 @@ impl EventHandler for Handler {
                     ping_out = format!("{:?}",{
                         &msg.reply_ping(&ctx,"msg1")
                          .await.unwrap().to_owned()
-                        .edit(&ctx,|m|m.content("edit: msg 2"))
-                         .await.unwrap()
+                        .react(&ctx,ReactionType::Unicode(format!("🃏"))).await.unwrap()
                     });
                 }
                 _ => {
