@@ -1,14 +1,17 @@
 use {
     //liboners::*,
+    oners_game::*,
     serenity::{
         async_trait,
-        model::{channel::Message, gateway::Ready,prelude::*},
+        model::{channel::Message, gateway::Ready, prelude::*},
         prelude::*,
     },
-    std::{collections::HashMap, env, path::Path,future::Future},
+    std::{collections::HashMap, env, future::Future, path::Path},
     tokio::fs::{create_dir_all, read_to_string, write, OpenOptions},
     tokio::io::AsyncWriteExt,
+    serde_json::{to_string_pretty,from_str},
 };
+pub mod oners_game;
 struct Handler;
 /// splits content into a vector of args by spaces
 ///
@@ -22,8 +25,8 @@ const PREFIX: &str = "/one";
 impl EventHandler for Handler {
     // Set a handler for the `add reaction` event - so that whenever a new reaction
     // is added - the closure (or function) passed will be called.
-    async fn reaction_add(&self, ctx: Context, re: Reaction){
-        println!("detected reaction {:?}",&re);
+    async fn reaction_add(&self, ctx: Context, re: Reaction) {
+        println!("detected reaction {:?}", &re);
     }
     // Set a handler for the `message` event - so that whenever a new message
     // is received - the closure (or function) passed will be called.
@@ -37,27 +40,103 @@ impl EventHandler for Handler {
             () // don't parse, not a command
         } else {
             println!("{:?}", &args[1..]);
+            let id_c = &msg.channel_id.0;
+            let id_u = &msg.author.id.0;
             let ping_out: String;
             //let ping_out: String;
-            match args[1] {
-                "help" => {
-                    ping_out = format!("h")
-                    //future_replies.push(msg.reply(&ctx,format!("(help message)")));
+            match args.get(1) {
+                None => {
+                    ping_out = format!("{}: missing subcommand", PREFIX);
                 }
-                "test" => {
-                    ping_out = format!("{:?}",{
-                        &msg.reply_ping(&ctx,"msg1")
-                         .await.unwrap().to_owned()
-                        .react(&ctx,ReactionType::Unicode(format!("🃏"))).await.unwrap()
-                    });
-                }
-                _ => {
-                    ping_out = format!("no command: \"{}\"", args[1]);
+                Some(arg1) => {
+                    match *arg1 {
+                        "help" => {
+                            ping_out = format!("h")
+                            //future_replies.push(msg.reply(&ctx,format!("(help message)")));
+                        }
+                        "game" => match args.get(2) {
+                            None => ping_out = format!("{}: missing argument", args[1]),
+                            Some(arg2) => match *arg2 {
+                                
+                                "create" => {
+                                    let id_c = &msg.channel_id.0;
+                                    let id_u = &msg.author.id.0;
+                                    let id_m = &msg
+                                        .reply_ping(&ctx, "msg1")
+                                        .await
+                                        .unwrap()
+                                        .to_owned()
+                                        .id
+                                        .0;
+                                    let game_token = format!("{}.{}", &id_u, &id_m);
+
+                                    create_dir_all(format!("games/{}", game_token))
+                                        .await
+                                        .unwrap();
+                                    let _ = write(
+                                        format!("games/{}/info.json", game_token),
+                                        format!("{{\"players\":[{}]}}", &id_u).as_bytes(),
+                                    )
+                                    .await
+                                    .unwrap();
+                                    create_dir_all(format!("users/{}", &id_u)).await.unwrap();
+                                    let _ = write(
+                                        format!("users/{}/info.json", &id_u),
+                                        format!("{{\"current_game\":\"{}\"}}", &game_token)
+                                            .as_bytes(),
+                                    )
+                                    .await
+                                    .unwrap();
+                                    let _ = &ctx
+                                        .http
+                                        .get_message(*id_c, *id_m)
+                                        .await
+                                        .unwrap()
+                                        .edit(&ctx, |m| m.content("game goes here"))
+                                        .await
+                                        .unwrap();
+                                    ping_out = format!("game created.\ntoken:\n`{}`",game_token);
+                                }
+                                "join" => match args.get(3) {
+                                    None => {
+                                        ping_out = format!("missing game token");
+                                    }
+                                    Some(arg3) => {
+                                        if !(Path::new(&format!("games/{}",arg3)).exists()) {
+                                            ping_out = format!("game does not exist!"); 
+                                        } else {
+                                            let game_info: GameInfo = 
+                                            from_str(
+                                                read_to_string(format!("games/{}/info.json",arg3))
+                                                .await.unwrap().as_str()
+                                            ).unwrap();
+                                            if game_info.players.contains(id_u) {
+                                                ping_out = format!("you are already a part of this game!");
+                                            } else {
+                                                ping_out = format!("looks like you can join!");
+                                            }
+                                        }
+                                        
+                                    }
+                                },
+                                _ => {
+                                    ping_out = format!("game: not a valid argument");
+                                }
+                            },
+                        },
+                        _ => {
+                            ping_out = format!("no command: \"{}\"", args[1]);
+                        }
+                    }
                 }
             }
-            let bot_msg_id = msg.reply_ping(ctx, format!("{}", ping_out)).await.unwrap().id.0;
-            println!("{} -> {}",bot_msg_id,ping_out);
-            
+            let bot_msg_id = msg
+                .reply_ping(ctx, format!("{}", ping_out))
+                .await
+                .unwrap()
+                .id
+                .0;
+            println!("{} -> {}", bot_msg_id, ping_out);
         }
     }
 
@@ -74,6 +153,7 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() {
+    
     // Configure the client with your Discord bot token in the environment.
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
     // Set gateway intents, which decides what events the bot will be notified about
